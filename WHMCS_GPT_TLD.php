@@ -1,83 +1,136 @@
 <?php
 
-require_once('../configuration.php');
+require '../configuration.php';
 
-// Function to parse CSV file and generate SQL statements
-function parseCSV($csvFile, $dbConnection) {
-    // Variable to store SQL statements
-    $sql = "";
+// Database connection details
+$db_host = $db_host ?? '';
+$db_port = $db_port !== '' ? (int)$db_port : 3306;
+$db_username = $db_username ?? '';
+$db_password = $db_password ?? '';
+$db_name = $db_name ?? '';
 
-    // Read the CSV file
-    if (($handle = fopen($csvFile, "r")) !== false) {
-        // Discard the first 5 rows
-        for ($i = 0; $i < 5; $i++) {
-            fgetcsv($handle);
-        }
+// Connect to the database
+$connection = mysqli_connect($db_host, $db_username, $db_password, $db_name, $db_port);
 
-        // Skip the header row
+if (!$connection) {
+    die("Database connection failed: " . mysqli_connect_error());
+}
+
+// Directory path for CSV files
+$csvDirectory = './csv/';
+
+// Get all .csv files in the directory
+$csvFiles = glob($csvDirectory . '*.csv');
+
+// Process each CSV file
+foreach ($csvFiles as $csvFile) {
+    // Open the CSV file
+    $handle = fopen($csvFile, 'r');
+
+    // Skip the first 5 lines
+    for ($i = 0; $i < 5; $i++) {
         fgetcsv($handle);
+    }
 
-        // Loop through the remaining rows
-        while (($row = fgetcsv($handle)) !== false) {
-            $tld = trim($row[0]);
-            $registrationPrice = trim($row[3]);
-            $renewalPrice = trim($row[6]);
+    // Process each line in the CSV file
+    while (($csvData = fgetcsv($handle)) !== false) {
+        // Extract the necessary data from the CSV row
+        $extension = trim($csvData[0]);
+        $registrationPrice = trim($csvData[3]);
+        $renewalPrice = trim($csvData[3]);
 
-            // Skip rows without TLD or rows without pricing information
-            if (empty($tld) || empty($registrationPrice) || empty($renewalPrice)) {
-                continue;
+        // Skip the record if extension is null or empty
+        if (empty($extension)) {
+            continue;
+        }
+        
+        // Check if the extension exists in tbldomainpricing
+        $selectQuery = "SELECT id FROM tbldomainpricing WHERE extension = ?";
+        $selectStatement = mysqli_prepare($connection, $selectQuery);
+        mysqli_stmt_bind_param($selectStatement, 's', $extension);
+        mysqli_stmt_execute($selectStatement);
+        $selectResult = mysqli_stmt_get_result($selectStatement);
+
+        if ($selectRow = mysqli_fetch_assoc($selectResult)) {
+            $domainPricingId = $selectRow['id'];
+            
+            // Check if the pricing record exists in tblpricing
+            $pricingQuery = "SELECT id FROM tblpricing WHERE type = 'domainregister' AND relid = ?";
+            $pricingStatement = mysqli_prepare($connection, $pricingQuery);
+            mysqli_stmt_bind_param($pricingStatement, 'i', $domainPricingId);
+            mysqli_stmt_execute($pricingStatement);
+            $pricingResult = mysqli_stmt_get_result($pricingStatement);
+            
+            if ($pricingRow = mysqli_fetch_assoc($pricingResult)) {
+                // Pricing record exists, update the existing record
+                $pricingId = $pricingRow['id'];
+                $updateQuery = "UPDATE tblpricing SET annually = ? WHERE id = ?";
+                $updateStatement = mysqli_prepare($connection, $updateQuery);
+                mysqli_stmt_bind_param($updateStatement, 'di', $registrationPrice, $pricingId);
+                mysqli_stmt_execute($updateStatement);
+            } else {
+                // Pricing record does not exist, insert a new record
+                $insertQuery = "INSERT INTO tblpricing (type, currency, relid, monthly, quarterly, semiannually, annually, biennially, triennially) VALUES ('domainregister', 1, ?, -1, -1, -1, ?, -1, -1)";
+                $insertStatement = mysqli_prepare($connection, $insertQuery);
+                mysqli_stmt_bind_param($insertStatement, 'id', $domainPricingId, $registrationPrice);
+                mysqli_stmt_execute($insertStatement);
             }
-
-            // Generate SQL statement for tbldomainpricing table
-            $dbConnection->query("INSERT INTO tbldomainpricing (extension, dnsmanagement, emailforwarding, idprotection, eppcode, autoreg, grace_period, redemption_grace_period, redemption_grace_period_fee, grace_period_fee) VALUES ('$tld', 0, 0, 0, 0, 1, -1, -1, -1, 0)");
-
+            
+            $pricingQuery = "SELECT id FROM tblpricing WHERE type = 'domainrenew' AND relid = ?";
+            $pricingStatement = mysqli_prepare($connection, $pricingQuery);
+            mysqli_stmt_bind_param($pricingStatement, 'i', $domainPricingId);
+            mysqli_stmt_execute($pricingStatement);
+            $pricingResult = mysqli_stmt_get_result($pricingStatement);
+            
+            if ($pricingRow = mysqli_fetch_assoc($pricingResult)) {
+                // Pricing record exists, update the existing record
+                $pricingId = $pricingRow['id'];
+                $updateQuery = "UPDATE tblpricing SET annually = ? WHERE id = ?";
+                $updateStatement = mysqli_prepare($connection, $updateQuery);
+                mysqli_stmt_bind_param($updateStatement, 'di', $renewalPrice, $pricingId);
+                mysqli_stmt_execute($updateStatement);
+            } else {
+                // Pricing record does not exist, insert a new record
+                $insertQuery = "INSERT INTO tblpricing (type, currency, relid, monthly, quarterly, semiannually, annually, biennially, triennially) VALUES ('domainrenew', 1, ?, -1, -1, -1, ?, -1, -1)";
+                $insertStatement = mysqli_prepare($connection, $insertQuery);
+                mysqli_stmt_bind_param($insertStatement, 'id', $domainPricingId, $renewalPrice);
+                mysqli_stmt_execute($insertStatement);
+            }
+        } else {
+            // Extension does not exist in tbldomainpricing, insert a new record
+            $insertQuery = "INSERT INTO tbldomainpricing (extension) VALUES (?)";
+            $insertStatement = mysqli_prepare($connection, $insertQuery);
+            mysqli_stmt_bind_param($insertStatement, 's', $extension);
+            mysqli_stmt_execute($insertStatement);
+            
             // Get the last inserted ID
-            $lastInsertIdResult = $dbConnection->query("SELECT LAST_INSERT_ID()");
-            $lastInsertIdRow = $lastInsertIdResult->fetch_row();
-            $lastInsertId = $lastInsertIdRow[0];
-            $lastInsertIdResult->close();
+            $domainPricingId = mysqli_insert_id($connection);
+            
+            // Insert pricing records in tblpricing
+            $insertQuery = "INSERT INTO tblpricing (type, currency, relid, monthly, quarterly, semiannually, annually, biennially, triennially) VALUES ('domainregister', 1, ?, -1, -1, -1, ?, -1, -1)";
+            $insertStatement = mysqli_prepare($connection, $insertQuery);
+            mysqli_stmt_bind_param($insertStatement, 'id', $domainPricingId, $registrationPrice);
+            mysqli_stmt_execute($insertStatement);
 
-            // Generate SQL statement for tblpricing table (domainregister)
-            $dbConnection->query("INSERT INTO tblpricing (type, currency, relid, msetupfee, qsetupfee, ssetupfee, asetupfee, bsetupfee, tsetupfee, monthly, quarterly, semiannually, annually, biennially, triennially) VALUES ('domainregister', 1, $lastInsertId, -1, -1, -1, -1, -1, -1, -1, -1, -1, $registrationPrice, -1, -1)");
-
-            // Generate SQL statement for tblpricing table (domaintransfer)
-            $dbConnection->query("INSERT INTO tblpricing (type, currency, relid, msetupfee, qsetupfee, ssetupfee, asetupfee, bsetupfee, tsetupfee, monthly, quarterly, semiannually, annually, biennially, triennially) VALUES ('domaintransfer', 1, $lastInsertId, -1, -1, -1, -1, -1, -1, -1, -1, -1, $registrationPrice, -1, -1)");
-
-            // Generate SQL statement for tblpricing table (domainrenew)
-            $dbConnection->query("INSERT INTO tblpricing (type, currency, relid, msetupfee, qsetupfee, ssetupfee, asetupfee, bsetupfee, tsetupfee, monthly, quarterly, semiannually, annually, biennially, triennially) VALUES ('domainrenew', 1, $lastInsertId, -1, -1, -1, -1, -1, -1, -1, -1, -1, $renewalPrice, -1, -1)");
+            $insertQuery = "INSERT INTO tblpricing (type, currency, relid, monthly, quarterly, semiannually, annually, biennially, triennially) VALUES ('domaintransfer', 1, ?, -1, -1, -1, ?, -1, -1)";
+            $insertStatement = mysqli_prepare($connection, $insertQuery);
+            mysqli_stmt_bind_param($insertStatement, 'id', $domainPricingId, $registrationPrice);
+            mysqli_stmt_execute($insertStatement);
+            
+            $insertQuery = "INSERT INTO tblpricing (type, currency, relid, monthly, quarterly, semiannually, annually, biennially, triennially) VALUES ('domainrenew', 1, ?, -1, -1, -1, ?, -1, -1)";
+            $insertStatement = mysqli_prepare($connection, $insertQuery);
+            mysqli_stmt_bind_param($insertStatement, 'id', $domainPricingId, $renewalPrice);
+            mysqli_stmt_execute($insertStatement);
         }
 
-        fclose($handle);
+        // Echo the extension, registration price, and renewal price
+        echo "Extension: $extension | Registration Price: $registrationPrice | Renewal Price: $renewalPrice" . PHP_EOL;
     }
 
-    return $sql;
-}
-
-$csvDirectory = "./csv/";
-$sqlStatements = "";
-
-// Create a new database connection
-$dbConnection = new mysqli($db_host, $db_username, $db_password, $db_name, $db_port ?: 3306);
-
-// Check if the connection was successful
-if ($dbConnection->connect_error) {
-    die("Database connection failed: " . $dbConnection->connect_error);
-}
-
-// Find all CSV files in the directory
-if (is_dir($csvDirectory)) {
-    $csvFiles = glob($csvDirectory . "*.csv");
-
-    foreach ($csvFiles as $csvFile) {
-        echo "Processing file: $csvFile\n";
-        $sqlStatements .= parseCSV($csvFile, $dbConnection);
-        echo "Done processing file: $csvFile\n";
-    }
+    fclose($handle);
 }
 
 // Close the database connection
-$dbConnection->close();
+mysqli_close($connection);
 
-echo "All CSV files processed.\n";
-echo "SQL statements:\n";
-echo $sqlStatements;
+echo "Bulk TLD import completed successfully.";
