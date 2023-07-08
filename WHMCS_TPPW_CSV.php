@@ -3,24 +3,24 @@
 /**
  * TPP Wholesale Domain Pricing CSV Importer for WHMCS
  *
- * This PHP script reads CSV files (in the TPP Wholesale format) containing domain pricing
+ * This PHP script reads CSV files ( in the TPP Wholesale format ) containing domain pricing
  * and imports it directly into a WHMCS database.
  *
  * Instructions:
- * 1. Place this script in the "admin" folder of your WHMCS installation.
- * 2. Place CSV files in a "csv" subdirectory within the "admin" folder.
- * 3. Run the script from the command line within the "admin" directory by executing "php WHMCS_TPPW_CSV.php".
+ * 1. Place this script in the 'admin' folder of your WHMCS installation.
+ * 2. Place CSV files in a 'csv' subdirectory within the 'admin' folder.
+ * 3. Run the script from the command line within the 'admin' directory by executing 'php WHMCS_TPPW_CSV.php'.
  *    It will immediately import all records from the CSV file into the WHMCS database.
  * 4. Existing domain extensions will be updated with new pricing, while new extensions will create new records.
  *
  * Please ensure the accuracy of the CSV files before running this script, as it will immediately import all records.
  *
- * @author Ben Childs (https://github.com/BenAChilds)
+ * @author Ben Childs ( https://github.com/BenAChilds )
  * @license GNU GPL v3
  * @version 1.0.0
  *
  * TERMS OF USE:
- * - This script is licensed under the GNU General Public License version 3 (GNU GPL v3).
+ * - This script is licensed under the GNU General Public License version 3 ( GNU GPL v3 ).
  * - You are free to modify and distribute this script under the terms of the GNU GPL v3 license.
  * - This script is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY.
  * - Please see the full text of the GNU GPL v3 license for more details.
@@ -42,7 +42,7 @@ $db_name = $db_name ?? '';
 $connection = mysqli_connect($db_host, $db_username, $db_password, $db_name, $db_port);
 
 if (!$connection) {
-    die("Database connection failed: " . mysqli_connect_error());
+    die('Database connection failed: ' . mysqli_connect_error());
 }
 
 // Directory path for CSV files
@@ -71,7 +71,7 @@ foreach ($csvFiles as $csvFile) {
             if (!$data[0] == '' || $data[0]) {
                 // This is a new TLD
                 $extension = trim($data[0]);
-                
+
                 // Get the registration & transfer prices from the next line
                 $registrationPrices = array_slice($csvData[$row + 1], 3);
                 foreach ($registrationPrices as $key => $reg) {
@@ -116,8 +116,8 @@ foreach ($csvFiles as $csvFile) {
 
                     // Echo the extension, registration price, and renewal prices
                     echo "Extension: $extension" . PHP_EOL;
-                    echo "Registration Price: " . implode(', ', $registrationPrices) . PHP_EOL;
-                    echo "Renewal Prices: " . implode(', ', $renewalPrices) . PHP_EOL;
+                    echo 'Registration Price: ' . implode(', ', $registrationPrices) . PHP_EOL;
+                    echo 'Renewal Prices: ' . implode(', ', $renewalPrices) . PHP_EOL;
                     echo PHP_EOL;
                 } else {
                     // Create new
@@ -135,8 +135,8 @@ foreach ($csvFiles as $csvFile) {
 
                     // Echo the extension, registration price, and renewal prices
                     echo "Extension: $extension" . PHP_EOL;
-                    echo "Registration Price: " . implode(', ', $registrationPrices) . PHP_EOL;
-                    echo "Renewal Prices: " . implode(', ', $renewalPrices) . PHP_EOL;
+                    echo 'Registration Price: ' . implode(', ', $registrationPrices) . PHP_EOL;
+                    echo 'Renewal Prices: ' . implode(', ', $renewalPrices) . PHP_EOL;
                     echo PHP_EOL;
                 }
             } else {
@@ -147,16 +147,16 @@ foreach ($csvFiles as $csvFile) {
         // Commit the transaction if the query executed successfully
         mysqli_commit($connection);
 
-        echo "Transaction committed successfully!" . PHP_EOL;
+        echo 'Transaction committed successfully!' . PHP_EOL;
     } catch (Exception $e) {
         // Rollback the transaction if an error occurred
         mysqli_rollback($connection);
 
-        echo "Transaction rolled back. Error: " . $e->getMessage() . PHP_EOL;
+        echo 'Transaction rolled back. Error: ' . $e->getMessage() . PHP_EOL;
     }
 }
 
 // Close the database connection
 mysqli_close($connection);
 
-echo "Bulk TLD import completed successfully." . PHP_EOL;
+echo 'Bulk TLD import completed successfully.' . PHP_EOL;
