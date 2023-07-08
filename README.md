@@ -13,7 +13,7 @@ Please ensure the accuracy of the CSV files before running this script, as it wi
 
 ## Author
 
-This script was created by [Ben Childs](https://github.com/BenAChilds).
+This script was created by [Ben Childs](https://github.com/BenAChilds), inspired by [thecravenone](https://github.com/thecravenone/WHMCS_Bulk_add_TLDs)'s work.
 
 ## License
 
