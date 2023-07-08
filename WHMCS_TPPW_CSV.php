@@ -122,7 +122,7 @@ foreach ($csvFiles as $csvFile) {
                 } else {
                     // Create new
                     $newRecordResult = mysqli_query($connection, "INSERT INTO tbldomainpricing (`extension`, `dnsmanagement`, `emailforwarding`, `idprotection`, `eppcode`, `autoreg`, `order`, `group`, `grace_period`, `grace_period_fee`, `redemption_grace_period`, `redemption_grace_period_fee`, `created_at`, `updated_at`)
-                                        VALUES ('$extension', 1, 1, 0, 1, 1, '0', 'none', -1, '0', -1, -1.00, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+                                        VALUES ('$extension', 0, 0, 0, 0, 'tppwregistrar', '0', 'none', -1, '0', -1, -1.00, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
                     $relid = mysqli_insert_id($connection);
 
                     // Insert new records in tblpricing
